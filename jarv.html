@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>JARVIS — Single File</title>
+<style>
+  :root{
+    --bg1:#020617; --bg2:#071038; --accent:#00e6a8; --glass: rgba(255,255,255,0.04);
+    --soft:rgba(255,255,255,0.06);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+  html,body{height:100%;margin:0;background:radial-gradient(circle at 10% 20%, rgba(0,230,168,0.03), transparent 10%), linear-gradient(135deg,var(--bg1),var(--bg2));color:#cfeef0;}
+  .wrap{display:grid;place-items:center;height:100%;padding:30px;box-sizing:border-box;}
+  .jarvis {
+    width:920px; max-width:96vw; min-height:540px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:18px; padding:24px; box-sizing:border-box;
+    box-shadow: 0 20px 50px rgba(2,6,23,0.7), inset 0 1px 0 rgba(255,255,255,0.02);
+    position:relative; overflow:hidden; backdrop-filter: blur(6px);
+  }
+
+  /* top bar */
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+  .title{display:flex;gap:12px;align-items:center;}
+  .logo{
+    width:56px;height:56px;border-radius:12px;background:linear-gradient(180deg,var(--accent),#00b880);
+    display:flex;align-items:center;justify-content:center;font-weight:700;color:#021;box-shadow:0 8px 24px rgba(0,230,168,0.08);
+    font-family:monospace;font-size:18px;
+  }
+  .title h1{margin:0;font-size:18px;letter-spacing:0.6px}
+  .title p{margin:0;font-size:12px;color:#9fd8cf}
+
+  .controls{display:flex;gap:10px;align-items:center;}
+  .btn{background:var(--glass);border:1px solid rgba(255,255,255,0.03);padding:8px 12px;border-radius:10px;cursor:pointer;font-size:13px;color:#bfeee2}
+  .btn:hover{transform:translateY(-2px);transition:all .12s ease}
+
+  /* main layout */
+  .main{display:grid;grid-template-columns:1fr 360px;gap:18px}
+  @media (max-width:980px){ .main{grid-template-columns: 1fr} .right-panel{order:2} }
+
+  /* left: conversation */
+  .console{
+    background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.006));
+    border-radius:12px;padding:18px;min-height:380px;max-height:60vh;overflow:auto;border:1px solid rgba(255,255,255,0.02);
+  }
+  .msg{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start}
+  .msg.me{flex-direction:row-reverse}
+  .avatar{width:42px;height:42px;border-radius:10px;background:linear-gradient(180deg,var(--accent),#00b880);display:flex;align-items:center;justify-content:center;color:#021;font-weight:700}
+  .bubble{max-width:78%;padding:12px 14px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.02);font-size:14px;color:#dffcff}
+  .bubble.system{background:linear-gradient(180deg, rgba(0,230,168,0.06), rgba(0,230,168,0.02)); color:#001b15;font-weight:600}
+
+  /* right panel */
+  .right-panel{display:flex;flex-direction:column;gap:14px}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.006));padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.02)}
+  .status{display:flex;gap:14px;align-items:center}
+  .ring{width:86px;height:86px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 30% 30%, rgba(0,230,168,0.06), transparent 20%);position:relative}
+  .dot{width:16px;height:16px;border-radius:50%;background:var(--accent);box-shadow:0 8px 30px rgba(0,230,168,0.14)}
+  .pulse{position:absolute;inset:0;border-radius:50%;animation:pulse 2s infinite}
+  @keyframes pulse{0%{transform:scale(.9);opacity:.6}50%{transform:scale(1.25);opacity:.12}100%{transform:scale(.9);opacity:.6}}
+
+  /* waveform */
+  .wave{height:60px;display:flex;align-items:center;gap:6px;justify-content:center}
+  .bar{width:4px;height:10px;border-radius:2px;background:linear-gradient(180deg,var(--accent),#00b880);opacity:.9;animation:wave 800ms infinite ease-in-out}
+  .bar:nth-child(2){animation-delay:80ms}
+  .bar:nth-child(3){animation-delay:160ms}
+  .bar:nth-child(4){animation-delay:260ms}
+  .bar:nth-child(5){animation-delay:360ms}
+  @keyframes wave{0%{transform:scaleY(.3)}50%{transform:scaleY(1.8)}100%{transform:scaleY(.3)}}
+
+  /* input */
+  .prompt{display:flex;gap:12px;align-items:center;margin-top:12px}
+  .input{flex:1;background:transparent;border:1px solid rgba(255,255,255,0.03);padding:12px;border-radius:12px;color:#dffcff;outline:none;font-size:14px}
+  .mic{width:52px;height:48px;border-radius:12px;background:linear-gradient(180deg, rgba(0,0,0,0.18), rgba(255,255,255,0.02));display:grid;place-items:center;cursor:pointer;border:1px solid rgba(255,255,255,0.03)}
+  .hint{font-size:12px;color:#95d3cc;margin-top:8px}
+
+  /* footer small */
+  .small{font-size:12px;color:#92d7cd}
+
+  /* floating credit */
+  .credit{position:absolute;right:16px;bottom:12px;font-size:12px;color:#8fd4c9;opacity:.9}
+
+  /* tiny responsiveness */
+  @media (max-width:480px){ .logo{width:46px;height:46px;font-size:16px} .ring{width:72px;height:72px} .jarvis{padding:16px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="jarvis" id="jarvisWindow">
+    <div class="topbar">
+      <div class="title">
+        <div class="logo">J</div>
+        <div>
+          <h1>JARVIS</h1>
+          <p>Personal assistant — voice & text</p>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn" id="helpBtn">Help</button>
+        <button class="btn" id="clearBtn">Clear</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <div>
+        <div class="console" id="console">
+          <!-- messages appended here -->
+          <div class="msg">
+            <div class="avatar">J</div>
+            <div class="bubble system">Hello. I am JARVIS. Say "Hey Jarvis", press the mic, or type a command. Type "help" for examples.</div>
+          </div>
+        </div>
+
+        <div class="prompt">
+          <input id="textInput" class="input" placeholder='Type a command, e.g. "what time is it", "open youtube", or "search cats"' />
+          <div class="mic" id="micBtn" title="Click to toggle listening">
+            <svg id="micIcon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z" stroke="#bff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 11v1a7 7 0 0 1-14 0v-1" stroke="#bff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+        <div class="hint small">Try voice commands: "what time is it", "open google", "search skyline images", "say hello", "shutdown"</div>
+      </div>
+
+      <div class="right-panel">
+        <div class="card">
+          <div class="status">
+            <div class="ring">
+              <div class="pulse"></div>
+              <div class="dot" id="statusDot"></div>
+            </div>
+            <div>
+              <div style="font-weight:700">Listening:</div>
+              <div id="listenStatus" class="small">idle</div>
+              <div style="margin-top:10px" class="wave" id="waveContainer">
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div class="small">Current Time</div>
+              <div id="clock" style="font-size:18px;font-weight:700;margin-top:6px"></div>
+            </div>
+            <div style="text-align:right">
+              <div class="small">Date</div>
+              <div id="date" style="font-weight:700;margin-top:6px"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:700;margin-bottom:8px">Quick Commands</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="btn" onclick="runText('what time is it')">What time is it</button>
+            <button class="btn" onclick="runText('open youtube')">Open YouTube</button>
+            <button class="btn" onclick="runText('search space images')">Search Images</button>
+            <button class="btn" onclick="runText('say hello')">Say Hello</button>
+            <button class="btn" onclick="runText('shutdown')">Shutdown</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="credit">Built-in Jarvis demo • Save as single HTML</div>
+  </div>
+</div>
+
+<script>
+  // -------- Utilities --------
+  const consoleEl = document.getElementById('console');
+  const textInput = document.getElementById('textInput');
+  const micBtn = document.getElementById('micBtn');
+  const listenStatus = document.getElementById('listenStatus');
+  const statusDot = document.getElementById('statusDot');
+  const clockEl = document.getElementById('clock');
+  const dateEl = document.getElementById('date');
+  const helpBtn = document.getElementById('helpBtn');
+  const clearBtn = document.getElementById('clearBtn');
+
+  function appendMessage(text, who='jarvis'){
+    const row = document.createElement('div');
+    row.className = 'msg' + (who==='me' ? ' me' : '');
+    const av = document.createElement('div'); av.className='avatar'; av.textContent = who==='me' ? 'U' : 'J';
+    const bubble = document.createElement('div'); bubble.className='bubble' + (who!=='me' && who!=='system' ? '' : (who==='system' ? ' system' : ''));
+    bubble.innerHTML = text;
+    row.appendChild(av); row.appendChild(bubble);
+    consoleEl.appendChild(row);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
+  function speak(text, opts={}){
+    try{
+      const synth = window.speechSynthesis;
+      if(!synth) return;
+      const ut = new SpeechSynthesisUtterance(text);
+      ut.rate = opts.rate || 1;
+      ut.pitch = opts.pitch || 1;
+      ut.lang = opts.lang || 'en-US';
+      synth.cancel();
+      synth.speak(ut);
+    }catch(e){ console.warn('TTS not available', e) }
+  }
+
+  // -------- Clock --------
+  function updateClock(){
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2,'0');
+    const mm = String(d.getMinutes()).padStart(2,'0');
+    const ss = String(d.getSeconds()).padStart(2,'0');
+    clockEl.textContent = `${hh}:${mm}:${ss}`;
+    dateEl.textContent = d.toLocaleDateString();
+  }
+  setInterval(updateClock, 1000); updateClock();
+
+  // -------- Simple command processor --------
+  function processCommand(text){
+    const t = String(text).trim().toLowerCase();
+    appendMessage(escapeHtml(text),'me');
+
+    // Wake word handling: user might say "hey jarvis" or similar
+    let clean = t.replace(/^(hey|hi|ok|yo)\s+/,'');
+    clean = clean.replace(/\s*jarvis\s*/,'').trim();
+
+    // built-in commands
+    if(/^(help|commands|what can you do)/.test(clean)){
+      const help = `<ul style="margin:0;padding-left:18px"><li>Say "what time is it"</li><li>"open youtube"</li><li>"search cats"</li><li>"say hello"</li><li>"shutdown"</li></ul>`;
+      appendMessage(help,'jarvis'); speak('Here are some things I can do. Check the screen for examples.');
+      return;
+    }
+
+    if(/(time|what time)/.test(clean)){
+      const now = new Date();
+      const phrase = `The time is ${now.toLocaleTimeString()}.`;
+      appendMessage(phrase,'jarvis'); speak(phrase);
+      return;
+    }
+
+    if(/date|day/.test(clean) && !/update|change/.test(clean)){
+      const d = new Date();
+      const phrase = `Today is ${d.toLocaleDateString(undefined, {weekday:'long', year:'numeric', month:'long', day:'numeric'})}.`;
+      appendMessage(phrase,'jarvis'); speak(phrase);
+      return;
+    }
+
+    if(/^(open|go to)\s+(youtube|google|github|gmail)/.test(clean)){
+      const m = clean.match(/(youtube|google|github|gmail)/);
+      const target = m ? m[1] : 'https://www.google.com';
+      const urls = {youtube:'https://www.youtube.com', google:'https://www.google.com', github:'https://github.com', gmail:'https://mail.google.com'};
+      appendMessage(`Opening ${target}...`,'jarvis'); speak(`Opening ${target}`);
+      window.open(urls[target]||('https://'+target), '_blank');
+      return;
+    }
+
+    if(/search\s+(.+)/.test(clean)){
+      const q = clean.match(/search\s+(.+)/)[1];
+      appendMessage(`Searching for <b>${escapeHtml(q)}</b>...`,'jarvis');
+      speak(`Searching the web for ${q}`);
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, '_blank');
+      return;
+    }
+
+    if(/say\s+hello|hello|hi\b/.test(clean)){
+      appendMessage('Hello! How can I help you today?','jarvis'); speak('Hello! How can I help you today?');
+      return;
+    }
+
+    if(/shutdown|sleep|stop listening/.test(clean)){
+      appendMessage('Shutting down voice listener. Say "wake up" or click the mic to start again.','jarvis');
+      speak('Shutting down. I will stop listening.');
+      stopRecognition();
+      return;
+    }
+
+    // fallback: echo and offer to search
+    appendMessage(`I didn't understand "<b>${escapeHtml(text)}</b>". I can search for it. Would you like that?`, 'jarvis');
+    speak("I didn't quite get that. I can search the web for you.");
+  }
+
+  function runText(t){ textInput.value = t; processCommand(t); }
+
+  // small HTML escape
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]})
+  }
+
+  // -------- Buttons --------
+  helpBtn.addEventListener('click', ()=> processCommand('help'));
+  clearBtn.addEventListener('click', ()=> { consoleEl.innerHTML=''; appendMessage('Cleared.','system'); });
+  textInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ processCommand(textInput.value); textInput.value=''; } });
+
+  // -------- Speech recognition (with prefix fallback) --------  //
+  let recognition = null;
+  let listening = false;
+
+  function hasSpeechRecognition(){
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  }
+
+  function createRecognition(){
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!SR) return null;
+    const r = new SR();
+    r.lang = 'en-US';
+    r.interimResults = false;
+    r.maxAlternatives = 1;
+    r.continuous = false; // we start again onend for repeated use
+    r.onstart = ()=> { listening=true; updateListenUI(true); }
+    r.onend = ()=> { listening=false; updateListenUI(false); /* keep ready-state: stop only if explicitly shutdown */ }
+    r.onerror = (ev)=> { console.warn('recognition error', ev); listening=false; updateListenUI(false); }
+    r.onresult = (ev)=>{
+      const transcript = ev.results[0][0].transcript;
+      appendMessage(escapeHtml(transcript),'me');
+      // detect wake word
+      let t = transcript.trim();
+      const lw = t.toLowerCase();
+      const woke = /^(hey|hi|ok)?\s*jarvis\b/i.test(lw) || lw.includes('jarvis');
+      // if wake word present, strip it and process remainder (if any), else process whole transcript
+      if(woke) {
+        t = t.replace(/^(hey|hi|ok)\s+/i, '').replace(/jarvis/i,'').trim();
+        if(!t) {
+          appendMessage('Yes?','jarvis'); speak('Yes?');
+        } else processCommand(t);
+      } else {
+        // process normally
+        processCommand(t);
+      }
+    };
+    return r;
+  }
+
+  function startRecognition(){
+    if(!hasSpeechRecognition()){ appendMessage('Speech recognition not supported in this browser. Use Chrome/Edge for best results.','system'); return; }
+    if(!recognition) recognition = createRecognition();
+    try{ recognition.start(); }catch(e){ console.warn('start error',e) }
+  }
+  function stopRecognition(){
+    if(recognition) try{ recognition.stop(); }catch(e){} updateListenUI(false);
+  }
+
+  function toggleRecognition(){
+    if(listening){ stopRecognition(); } else { startRecognition(); }
+  }
+
+  micBtn.addEventListener('click', ()=>{
+    toggleRecognition();
+  });
+
+  function updateListenUI(isListening){
+    listenStatus.textContent = isListening ? 'listening' : 'idle';
+    statusDot.style.background = isListening ? 'linear-gradient(180deg,var(--accent),#00b880)' : 'linear-gradient(180deg,#6fd2c0,#4b7f84)';
+    // animate waveform more intensely when listening
+    const bars = document.querySelectorAll('.bar');
+    bars.forEach((b,i)=>{
+      if(isListening){
+        b.style.animationDuration = (500 + i*80)+'ms';
+        b.style.opacity = 1;
+      } else {
+        b.style.animationDuration = (900 + i*100)+'ms';
+        b.style.opacity = 0.45;
+      }
+    });
+  }
+
+  // Try to initialize recognition on load but don't start listening automatically
+  if(hasSpeechRecognition()){
+    recognition = createRecognition();
+    updateListenUI(false);
+  } else {
+    appendMessage('Speech recognition not available. Use the text box or run in Chrome/Edge for voice features.','system');
+    updateListenUI(false);
+  }
+
+  // Provide a soft "wake word" prompt: start listening when user says "hey jarvis" via recognition won't be active without click
+  // NOTE: for security browsers require user gesture to use mic; clicking the mic toggles it.
+
+  // Helpful Hotkeys
+  document.addEventListener('keydown', (e)=>{
+    if(e.key==='/' && document.activeElement !== textInput){ e.preventDefault(); textInput.focus(); }
+    if(e.key==='m' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); toggleRecognition(); }
+  });
+
+  // small UX helpers: click console to focus input
+  consoleEl.addEventListener('click', ()=> textInput.focus());
+
+  // show an initial system message
+  appendMessage('Ready. Click the mic to start listening. Use Ctrl/Cmd+M to toggle microphone.','system');
+
+  // make window draggable (small)
+  (function makeDraggable(){
+    const node = document.getElementById('jarvisWindow');
+    let px,py,drag=false;
+    node.addEventListener('pointerdown', (e)=>{
+      if(e.target.closest('.btn') || e.target.closest('.input') || e.target.closest('.mic')) return;
+      drag=true; px=e.clientX; py=e.clientY; node.style.transition='none';
+    });
+    window.addEventListener('pointermove', (e)=>{
+      if(!drag) return;
+      const dx = e.clientX-px, dy=e.clientY-py;
+      const rect = node.getBoundingClientRect();
+      node.style.transform = `translate(${dx}px, ${dy}px)`;
+    });
+    window.addEventListener('pointerup', ()=>{ if(drag){ drag=false; node.style.transition='transform .2s'; setTimeout(()=>node.style.transform='none',220)} });
+  })();
+
+  // Accessibility: polite announcements
+  function announcePolite(text){ try{ const ar = new SpeechSynthesisUtterance(text); ar.lang='en-US'; ar.rate=1; window.speechSynthesis.speak(ar);}catch(e){} }
+
+  // Safety: if user asks for restricted/unsafe actions, give refusal (simple keywords)
+  function isUnsafe(text){
+    const banned = ['hack','password','key','exploit','bypass','steal'];
+    return banned.some(b=> text.toLowerCase().includes(b));
+  }
+
+  // Small modification: intercept processCommand to check safety
+  const originalProcess = processCommand;
+  processCommand = function(text){
+    if(isUnsafe(text)){
+      appendMessage('I cannot help with that. Try a different request.','jarvis');
+      speak('Sorry, I can not assist with that.');
+      return;
+    }
+    originalProcess(text);
+  };
+</script>
+</body>
+</html>
